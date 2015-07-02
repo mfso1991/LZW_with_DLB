@@ -9,69 +9,75 @@ public class DLB4LZW
 {
 	private DLBnode4LZW[] roots = new DLBnode4LZW[256];
 	private PushbackInputStream in = null;
-	private StringBuilder str = null;
-	private char ch;
-	private int readVal;
-	private int encode;
-	private int codeword;
-	private int width;
 	
 	public DLB4LZW(PushbackInputStream in)
 	{
 		this.in = in;
-		for(int i = 0 ; i < 256 ; i++)
-			roots[i] = new DLBnode4LZW((char)i , i);
+		
+		/**
+		 *	the first level being an array instead of linked DLBnodes.
+		 *	potentially memory overhead with a trivial amount, 
+		 *  this design however provides codewords to be built upon and ease the search at the beginning.  
+		 */
+			for(int i = 0 ; i < 256 ; i++)
+				roots[i] = new DLBnode4LZW((char)i , i);
 	}
 	
-	public boolean hasNext()
+	public int maxPrefixLength(int codeword, int width) throws Exception
 	{
-		return (readVal = in.read()) != -1;
+		int input = in.read(); /**
+		                        * the first character read for each maxPrefixLength(@int, @int).
+								* the corresponding root is guaranteed to be found in O(1) using roots[index], given being non-negative.
+								* returning -1 to signify EOF of the input stream.
+								*/
+		if(input != -1)
+		{
+			char ch = (char)input; 
+			StringBuilder str = new StringBuilder();
+			
+			/**
+			 *	while writing out the codeword found is the main purpose, 
+			 *	@parameter : str is updated along with the execution of maxPrefixCode(@StringBuilder, @DLBnode4LZW, @int). 
+			 */
+				BinaryStdOut.write(maxPrefixCode(str.append(ch), roots[ch], codeword), width);
+			
+			return str.length();
+		}
+		BinaryStdOut.write(256, width); /** 256 is the reserved codeword for EOF of the compressed stream. **/
+		return input; /** returning -1 causes loop termination of the LZW process. **/ 
 	}
 	
-	public StringBuilder findMaxPrefix(int codeword, int width) throws Exception
+	private int maxPrefixCode(StringBuilder str, DLBnode4LZW node, int codeword) throws Exception
 	{
-		this.codeword = codeword;
-		this.width = width;
-		str = new StringBuilder();
-		ch = (char)readVal;
-		str.append(ch);
-		DLBnode4LZW root = roots[ch];
-		encode = root.codeword;
-		if(this.hasNext())
-			return findMaxPrefix(str, root);
-		BinaryStdOut.write(encode, width);
-		return str;
-	}
-	
-	private StringBuilder findMaxPrefix(StringBuilder str, DLBnode4LZW node) throws Exception
-	{
-		ch = (char)readVal;
+		int val; /** might be pushed back into the input stream if not matched. **/
+		if((val = in.read()) == -1) /** EOF of the input stream reached --> returning the codeword found so far. **/ 
+			return node.codeword;
+			
+		char ch = (char)val;
 		if(node.child != null)
 		{
-			node = node.child;
-			DLBnode4LZW former = null;
+			node = node.child; /** traversing the next level horizontally to match ch **/
+			DLBnode4LZW last = null; /** will be one DLBnode4LZW behind the current node **/
 			do
 			{
-				if(ch == node.ch)
-				{
-					str.append(ch);
-					encode = node.codeword;
-					if(this.hasNext())
-						return findMaxPrefix(str, node);
-					BinaryStdOut.write(encode, width);
-					return str;
-				}
-				former = node;
+				if(ch == node.ch) /** ch matched --> traversing the next level **/
+					return maxPrefixCode(str.append(ch), node, codeword);
+				last = node;
 				node = node.sibling;
 			}
-			while(node != null);				
-			former.sibling = new DLBnode4LZW(ch, codeword);
+			while(node != null); /** node being null <=> last being the last valid DLBnode4LZW **/				
+			last.sibling = new DLBnode4LZW(ch, codeword);
 		}
-		else node.child = new DLBnode4LZW(ch, codeword);
-
-		in.unread(readVal);
-		BinaryStdOut.write(encode, width);
-		return str;
+		else /** node.child being null --> building head node for node's children-level **/ 
+			node.child = new DLBnode4LZW(ch, codeword);
+			
+		/**
+		 * having not matched --> 
+		 * 1.pushing back the byte read at the beginning so that it is re-readable.
+		 * 2.returning the codeword found so far.
+		 */
+			in.unread(val);
+			return node.codeword;
 	}
 	
 		private class DLBnode4LZW
