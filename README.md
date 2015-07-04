@@ -1,5 +1,5 @@
 # LZW_with_DLB
-LZW compression using de la briandais tree. 
+Adapted from my project in Algorithm course, it uses a modified de la briandais tree instead of the TST tree provided in Robert Sedgewick's "Algorithms"  
 
 ## key features
 1. searching prefix and adding new codeword are done simultaneously.
