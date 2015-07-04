@@ -6,34 +6,22 @@
 import java.io.*;
 import java.util.*; 
  
-public class LZW
+public class LZWmod
 {	
 	/** making variable scope as limiting as possible. **/
 	public static void compress(int width, int length, int code) throws Exception 
 	{ 
 		DLB4LZW dlb = new DLB4LZW(new PushbackInputStream(System.in));
-		/** TRUE till EOF of the input stream **/
-		while(dlb.maxPrefixFound(code++, width))
-		{
-			if(code == length) 
+		/** FALSE as having reached EOF of the input stream. **/
+		while(dlb.maxPrefixFound(code++, width, code < 65536))
+			/** having exhausted all of the current legitimate codewords. **/
+			if(code == length && width < 16) 
 			{	
-				/** increment code size **/
-				if(width < 16)
-				{
-					width++;
-					length <<= 1;
-				}
-				/** if 16-bit bound was met, reset is performed **/
-				else
-				{
-					width = 9;
-					length = 512;
-					code = 257;	
-					dlb.init();
-				}
+				width++;
+				length <<= 1;
 			}
-		}
-    } 
+	}
+ 
 
 	/** making variable scope as limiting as possible. **/
     public static void expand(int width, int length) 
@@ -49,40 +37,34 @@ public class LZW
         String str = st[code];
 
 		while(true) 
-		{
-			/**
-			 *	The codeword width in [9, 16].
-			 *  Increment codeword width only when 2^width codewords have been added. 
-			 */
-				if(i + 1 == length) 
-				{	
-					/** increment code size **/
-					if(width < 16)
-					{
-						width++;
-						length <<= 1;
-					}
-					/** if 16-bit bound was met, reset is performed **/
-					else
-					{
-						width = 9;
-						length = 512;	
-						st = new String[65536];
-						for (i = 0; i < 256; i++)
-							st[i] = "" + (char) i;
-						st[i++] = "";
-					}
-				}
-				
+		{				
+		   /** incrementing the codeword width only when 2^width codewords have been added. **/
+			if(i + 1 == length && width < 16)
+			{
+				width++;
+				length <<= 1;
+			}
+			
             BinaryStdOut.write(str);
             code = BinaryStdIn.readInt(width);
             if (code == 256) break;
             String _str = st[code];
             if (i == code) _str = str + str.charAt(0);   /** special case check **/
-			if (i < 65536) st[i++] = str + _str.charAt(0);
+			st[i++] = str + _str.charAt(0);
+			
+			/** having exhausted all legitimate codewords. **/
+			if(i == 65536)
+			{
+				BinaryStdOut.write(_str);
+				break; 
+			}	
 			str = _str;
         }
-        BinaryStdOut.close(); /** flushing out buffer **/
+		
+		while((code = BinaryStdIn.readInt(16)) != 256)
+			BinaryStdOut.write(st[code]);
+        
+		BinaryStdOut.close(); /** flushing out buffer **/
     }
 
     public static void main(String[] args) throws Exception
